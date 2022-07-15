@@ -8,5 +8,7 @@ edition = "2021"
 [dependencies]
 # egui = "0.18.1"
 eframe = "0.18.0"
+egui_extras = { features = ["image"] }
+image = { features = ["png", "jpeg"] }
 # dirs = "4.0.0"
 # clipboard-win = "4.4.1"
