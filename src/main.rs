@@ -1,6 +1,7 @@
-use std::env;
+//use std::env;
 use eframe::egui;
 use egui_extras::RetainedImage;
+use clap::{Arg, Command, Parser};
 //use image;
 
 struct RefImageView {
@@ -94,26 +95,75 @@ impl eframe::App for RefImageView {
 }
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
-    println!("{:?}", args);
+    let matches = Command::new("Reference Image Viewer")
+        .author("Jukka Kelanne, jukka.kelanne@gmail.com")
+        .version("0.1")
+        .about("Lightweight (hopefully) image viewer")
+        .arg(
+            Arg::new("file")
+                .short('f')
+                .long("file")
+                .takes_value(true)
+                .help("Start RIV with an image"))
+        .arg(
+            Arg::new("directory")
+                .short('d')
+                .long("directory")
+                .takes_value(true)
+                .help("Start RIV with a directory"))
+        .arg(
+            Arg::new("INPUT")
+                //.about("Sets the input file")
+                .required(false)
+                .index(1))
+        .get_matches();
+
     let options = eframe::NativeOptions::default();
+    let in_file = matches.value_of("INPUT");
+    let mut ci: Option<egui::ColorImage> = None;
 
-    if args.len() > 1 {
-        if std::path::Path::new(&args[1]).exists() {
-            // Bake error handling into load_image_from_path()
-            let ci = load_image_from_path(std::path::Path::new(&args[1])).unwrap();
+    match in_file {
+        None => { 
+            // Don't really have to do anything here..
+            // println!("You need to enter a file with file argument!");
+        },
+        Some(s) => {
+            let path = std::path::Path::new(s);
 
+            if path.is_file() {
+                println!("INPUT is a file..");
+                //let ci = load_image_from_path(std::path::Path::new(s)).unwrap();
+                ci = Some(load_image_from_path(path).unwrap());
+            } else {
+                println!("INPUT is a directory..");
+                for entry in path.read_dir().expect("read_dir call failed") {
+                    if let Ok(entry) = entry {
+                        // So with this we can load image(s) from a directory. Now we just need to figure out how to handle the files
+                        // Also.. this is a stupid way of doing thinghs. we should not create the window inside these conditinals. Instead
+                        // we should just load the files here and then load the window after images have been loaded.
+                        println!("{:?}", entry.path());
+
+                        ci = Some(load_image_from_path(entry.path().as_path()).unwrap());
+                    }
+                }
+            }
+        }
+    }
+
+    match ci {
+        None => {
             eframe::run_native(
                 "Reference Image Viewer",
                 options,
-                Box::new(|cc| Box::new(RefImageView::new_with_colorimage(cc, ci, 0.5))),
+                Box::new(|cc| Box::new(RefImageView::new(cc))),
             );
-        }    
-    } else {
-        eframe::run_native(
-            "Reference Image Viewer",
-            options,
-            Box::new(|cc| Box::new(RefImageView::new(cc))),
-        );
+        },
+        Some(i) => {
+            eframe::run_native(
+                "Reference Image Viewer",
+                options,
+                Box::new(|cc| Box::new(RefImageView::new_with_colorimage(cc, i, 0.5))),
+            );
+        }
     }
 }

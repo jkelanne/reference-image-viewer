@@ -10,5 +10,6 @@ edition = "2021"
 eframe = "0.18.0"
 egui_extras = { features = ["image"] }
 image = { features = ["png", "jpeg"] }
+clap = { version = "3.2.12", features = ["derive"] }
 # dirs = "4.0.0"
 # clipboard-win = "4.4.1"
