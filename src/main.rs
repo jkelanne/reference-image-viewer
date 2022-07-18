@@ -7,9 +7,6 @@ use clap::{Arg, Command}; // , Parser
 //use assets_manager::{Asset, AssetCache, loader};
 //extern crate directories;
 use directories::{UserDirs, ProjectDirs};
-
-//use image;
-
 // We'll call this Images for now.. ImageCache, though it's not really a cache?
 pub struct Images {
     // Holds the images. Going with pub for now..
@@ -20,11 +17,6 @@ pub struct Images {
 
 impl Images {
     pub fn new(images: Vec<RetainedImage>) -> Self {
-/*        let index = match images.len() {
-            0 => None,
-            _ => Some(0),
-        };*/
-
         Self {
             images,
             index: 0
@@ -64,41 +56,10 @@ impl Images {
 }
 
 struct RefImageView {
-    //image: RetainedImage,
     images: Images,
     image_scale: f32,
     auto_resize: bool,
-    //cache: AssetCache,
 }
-
-/*impl Default for RefImageView {
-    fn default() -> Self {
-        /*let mut cache: AssetCache;
-        if let Some(proj_dirs) = ProjectDirs::from("com", "null ptr", "refiv") {
-            if !path::Path::new(proj_dirs.config_dir()).exists() {
-                fs::create_dir_all(proj_dirs.config_dir());
-            }
-            cache = AssetCache::new(proj_dirs.config_dir()).unwrap();
-        }*/
-        let proj_dirs = ProjectDirs::from("com", "null ptr", "refiv").unwrap();
-        println!("Config dirs: {:?}; exists: [{}]", proj_dirs.config_dir(), path::Path::new(proj_dirs.config_dir()).exists());
-        println!("Cache dirs: {:?}; exists: [{}]", proj_dirs.cache_dir(), path::Path::new(proj_dirs.cache_dir()).exists());
-        println!("Data dirs: {:?}; exists: [{}]", proj_dirs.data_dir(), path::Path::new(proj_dirs.data_dir()).exists());
-        // Config dirs: "C:\\Users\\jukka\\AppData\\Roaming\\null ptr\\refiv\\config"
-        // Cache dirs: "C:\\Users\\jukka\\AppData\\Local\\null ptr\\refiv\\cache"
-        // Data dirs: "C:\\Users\\jukka\\AppData\\Roaming\\null ptr\\refiv\\data"
-        // }
-/*        Self {
-            image: RetainedImage::from_image_bytes(
-                "FXm37GQaMAAAYs7.png",
-                include_bytes!("../resources/FXm37GQaMAAAYs7.png"),
-            ).unwrap(),
-            image_scale: 0.25,
-            auto_resize: false, 
-            //ache: AssetCache::new(proj_dirs.config_dir()).unwrap()
-        }*/
-    }   
-}*/
 
 fn load_image_from_path(path: &std::path::Path) -> Result<egui::ColorImage, image::ImageError> {
     let image = image::io::Reader::open(path)?.decode()?;
@@ -115,43 +76,16 @@ fn load_image_from_path(path: &std::path::Path) -> Result<egui::ColorImage, imag
 impl RefImageView {
     fn new(cc: &eframe::CreationContext<'_>, images: Images) -> Self {
         cc.egui_ctx.set_visuals(egui::Visuals::dark());
-        //Self::default()
         Self {
-/*            image: RetainedImage::from_color_image(
-                "filename",
-                ci,
-            ),*/
             images,
             image_scale: 1.0,
             auto_resize: false,
-            //cache: AssetCache::new(proj_dirs.config_dir()).unwrap()
         }  
     }
-
-/*    /*fn new_with_colorimage(cc: &eframe::CreationContext<'_>, ci: egui::ColorImage, scale: f32) -> Self {*/
-    fn new_with_colorimage(cc: &eframe::CreationContext<'_>, ci: Images, scale: f32) -> Self {
-        cc.egui_ctx.set_visuals(egui::Visuals::dark());
-        let proj_dirs = ProjectDirs::from("com", "null ptr", "refiv").unwrap();
-
-        Self {
-            image: RetainedImage::from_color_image(
-                "filename",
-                ci,
-            ),
-            image_scale: scale,
-            auto_resize: false,
-            //cache: AssetCache::new(proj_dirs.config_dir()).unwrap()
-        }    
-    }*/
 }
 
 impl eframe::App for RefImageView {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        /*
-            pub keys_down: HashSet<Key>,
-            pub events: Vec<Event>,
-        */
-
         egui::TopBottomPanel::top("rev_top_panel").show(ctx, |ui| {
             if ui.input_mut().consume_key(egui::Modifiers::NONE, egui::Key::ArrowRight) {
                 println!("IS IT HAPPENING?!?!?");
@@ -187,31 +121,21 @@ impl eframe::App for RefImageView {
         egui::CentralPanel::default().show(ctx, |ui| {
             if self.auto_resize {
                 let panel_ratio = ui.available_width() / ui.available_height();
-                //println!("ui width: {}; height: {}", ui.available_width(), ui.available_height());
+
                 let i_size = self.images.get_size_of_current();
                 let image_ratio = i_size[0] as f32 / i_size[1] as f32;
 
-                //println!("panel_ratio: {}; image_ratio: {}", panel_ratio, image_ratio);
 
                 if panel_ratio > image_ratio {
                     self.image_scale = ui.available_height() / i_size[1] as f32;
                 } else {
                     self.image_scale = ui.available_width() / i_size[0] as f32;
                 }
-                //println!("self.image_scale: {}", self.image_scale);
             }
-            /*
-                RetainedImage::from_color_image(
-                    "filename",
-                    ci,
-                )
-            */
-            //let ni = RetainedImage::from_color_image("filename", self.images.get(0).unwrap());
-            //ni.show(ui);
+
             if self.images.has_images() {
                 self.images.get(self.images.index).unwrap().show_scaled(ui, self.image_scale);    
             }
-            //self.image.get(0).show_scaled(ui, self.image_scale);
         });
     }
 }
@@ -262,7 +186,6 @@ fn main() {
     match in_file {
         None => { 
             // Don't really have to do anything here..
-            // println!("You need to enter a file with file argument!");
         },
         Some(s) => {
             let path = std::path::Path::new(s);
@@ -270,22 +193,7 @@ fn main() {
             if path.is_file() {
                 println!("INPUT is a file..");
                 let ri = RetainedImage::from_color_image("filename", load_image_from_path(path).unwrap());
-                //im_vec.push(load_image_from_path(path).unwrap());
                 im_vec.push(ri);
-
-                /* 
-                    image: RetainedImage::from_color_image(
-                        "filename",
-                        ci,
-                    ),*/
-
-                //let ci = load_image_from_path(std::path::Path::new(s)).unwrap();
-                //ci = Some(load_image_from_path(path).unwrap());
-                //match ci {
-                //    None => {},
-                //    Some(image) => im_vec.push(image),
-                //}
-                //im_vec.push(ci);
             } else {
                 println!("INPUT is a directory..");
                 for entry in path.read_dir().expect("read_dir call failed") {
@@ -293,12 +201,9 @@ fn main() {
                         // So with this we can load image(s) from a directory. Now we just need to figure out how to handle the files
                         // Also.. this is a stupid way of doing thinghs. we should not create the window inside these conditinals. Instead
                         // we should just load the files here and then load the window after images have been loaded.
-                        //println!("{:?}", entry.path());
 
-                        //ci = Some(load_image_from_path(entry.path().as_path()).unwrap());
                         let ri = RetainedImage::from_color_image("filename", load_image_from_path(entry.path().as_path()).unwrap());
                         im_vec.push(ri);
-                        //im_vec.push(load_image_from_path(entry.path().as_path()).unwrap());
                     }
                 }
             }
@@ -311,20 +216,4 @@ fn main() {
         options,
         Box::new(|cc| Box::new(RefImageView::new(cc, images))),
     );
-/*    match ci {
-        None => {
-            eframe::run_native(
-                "Reference Image Viewer",
-                options,
-                Box::new(|cc| Box::new(RefImageView::new(cc))),
-            );
-        },
-        Some(i) => {
-            eframe::run_native(
-                "Reference Image Viewer",
-                options,
-                Box::new(|cc| Box::new(RefImageView::new_with_colorimage(cc, i, 0.5))),
-            );
-        }
-    }*/
 }
