@@ -6,10 +6,13 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-# egui = "0.18.1"
 eframe = "0.18.0"
 egui_extras = { features = ["image"] }
 image = { features = ["png", "jpeg"] }
 clap = { version = "3.2.12", features = ["derive"] }
-# dirs = "4.0.0"
+assets_manager = "0.8.1"
+directories = "4.0.1"
+
+# Don't need these yet, but planning to use them..
+# serde = "1.0.139"
 # clipboard-win = "4.4.1"
