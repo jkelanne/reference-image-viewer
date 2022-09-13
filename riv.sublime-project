@@ -1,0 +1,27 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"build_systems": [
+		{
+	        "name": "Rust Test",
+	        "cmd": ["cargo", "build"],
+            "variants": [
+	 		    {
+	    		    "cmd": ["cargo", "run"],
+	        		"name": "Run"
+	        	},
+	        	{
+	            	"cmd": ["cargo", "run", "-r", "--", "$file_path/../resources"],
+	        	    "name": "Release"
+	        	}
+    		]
+	    },
+	    {
+	        "name": "List",
+	        "cmd": "ls"
+	    }	
+	]
+}
