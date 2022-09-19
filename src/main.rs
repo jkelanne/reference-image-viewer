@@ -3,6 +3,8 @@ use eframe::egui;
 use std::{path, fs};
 use std::collections::HashMap;
 use std::slice::SliceIndex;
+use std::thread;
+use std::sync::mpsc;
 //use std::hash::{Hash, Hasher};
 use egui_extras::RetainedImage;
 use clap::{Arg, Command}; // , Parser
@@ -22,15 +24,17 @@ struct MetaData {
 pub struct Images {
     // Holds the images. Going with pub for now..
     pub images: Vec<RetainedImage>,
+    pub hashes: Vec<String>,
     // Holds the current index
     pub index: usize,
     pub tags: HashMap<String, Vec<String>>,
 }
 
 impl Images {
-    pub fn new(images: Vec<RetainedImage>) -> Self {
+    pub fn new(images: Vec<RetainedImage>, hashes: Vec<String>) -> Self {
         Self {
             images,
+            hashes,
             index: 0,
             tags: HashMap::new()
         }
@@ -55,7 +59,7 @@ impl Images {
     }
 
     fn next(&mut self) {
-        println!("self.index: {}; self.images.len: {}", self.index, self.images.len());
+        //println!("self.index: {}; self.images.len: {}", self.index, self.images.len());
         if self.index < (self.images.len() - 1) {
             self.index += 1;
         }
@@ -66,17 +70,31 @@ impl Images {
             self.index -= 1;
         }
     }
+
+    fn get_current_image_hash(&self) -> String {
+/*        let hash1 = blake3::hash(self.images[self.index].as_bytes());
+        return hash1.to_string();*/
+        //println!("Should return hash: {}", self.hashes[self.index]);
+        if self.hashes.len() > 0 {
+            //let t = String::from(&self.hashes[self.index]);    
+            return String::from(&self.hashes[self.index]);    
+        }
+        return String::from("");
+    }
 }
 
 // We should add checksums for loaded images so that we don't have to generate them again
 struct RefImageView {
     images: Images,
+    rx: mpsc::Receiver<(RetainedImage, std::string::String)>,
     image_scale: f32,
     auto_resize: bool,
 }
 
-fn load_image_from_path(path: &std::path::Path) -> std::result::Result<egui::ColorImage, image::ImageError> {
-    let image = image::io::Reader::open(path)?.decode()?;
+fn load_image_from_path(path: &std::path::Path) -> 
+    (std::result::Result<egui::ColorImage, image::ImageError>, String) {
+    //let image = image::io::Reader::open(path)?.decode()?;
+    let image = image::io::Reader::open(path).unwrap().decode().unwrap();
     let size = [image.width() as _, image.height() as _];
     let image_buffer = image.to_rgba8();
     let pixels = image_buffer.as_flat_samples();
@@ -86,19 +104,32 @@ fn load_image_from_path(path: &std::path::Path) -> std::result::Result<egui::Col
     //let bytes = image.as_bytes();
     let hash1 = blake3::hash(image.as_bytes());
 
-    println!("checksum for {:?} :: {:?}", path, hash1.to_hex());
+    //println!("checksum for {:?} :: {:?}", path, hash1.to_hex());
 
-    Ok(egui::ColorImage::from_rgba_unmultiplied(
-        size,
-        pixels.as_slice(),
-    ))
+    (
+        Ok(egui::ColorImage::from_rgba_unmultiplied(
+            size,
+            pixels.as_slice(),
+        )),
+        String::from(hash1.to_hex().as_str())
+    )
 }
 
 impl RefImageView {
-    fn new(cc: &eframe::CreationContext<'_>, images: Images) -> Self {
+    //fn new(cc: &eframe::CreationContext<'_>, images: Images) -> Self {
+        // std::sync::
+        // mpsc::Receiver<(std::result::Result<egui::ColorImage, image::ImageError>, String)>
+    fn new(cc: &eframe::CreationContext<'_>, rx: mpsc::Receiver<(RetainedImage, std::string::String)>) -> Self {
         cc.egui_ctx.set_visuals(egui::Visuals::dark());
+        //let images = Images::new(im_vec, hash_vec);
+
+        let mut im_vec: Vec<RetainedImage> = Vec::new();
+        let mut hash_vec: Vec<String> = Vec::new();
+        let mut images = Images::new(im_vec, hash_vec);
+
         Self {
             images,
+            rx,
             image_scale: 1.0,
             auto_resize: false,
         }  
@@ -107,6 +138,17 @@ impl RefImageView {
 
 impl eframe::App for RefImageView {
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+        let incoming_image = self.rx.try_recv();
+        match incoming_image {
+            Ok(v) => {
+                let (img, hash) = v;
+                self.images.images.push(img);
+                self.images.hashes.push(hash);
+                                    //im_vec.push(ri);
+                    //hash_vec.push(String::from(hash));
+            },
+            Err(_) => ()
+        }
         egui::TopBottomPanel::top("rev_top_panel").show(ctx, |ui| {
             if ui.input_mut().consume_key(egui::Modifiers::NONE, egui::Key::ArrowRight) {
                 //println!("IS IT HAPPENING?!?!?");
@@ -185,7 +227,7 @@ impl eframe::App for RefImageView {
             .fixed_pos((size.width() - 240.0, size.height() - 70.0))
             .show(ctx, |ui| {
                 ui.label(
-                    egui::RichText::new("Test thingie.."),
+                    egui::RichText::new(self.images.get_current_image_hash()),
                 );
                 ui.label(format!("available_size {:?}", size));
                 ui.label(format!("current_size {:?}", ui.available_size()))
@@ -247,38 +289,57 @@ fn main() {
     }
 
     let options = eframe::NativeOptions::default();
-    let in_file = matches.value_of("INPUT");
+    
     //let mut ci: Option<egui::ColorImage> = None;
 
-    let mut im_vec: Vec<RetainedImage> = Vec::new();
+    let (tx, rx) = mpsc::channel();
 
-    match in_file {
-        None => { 
-            // Don't really have to do anything here..
-        },
-        Some(s) => {
-            let path = std::path::Path::new(s);
+    thread::spawn(move || {
+/*        
+        let mut im_vec: Vec<RetainedImage> = Vec::new();
+        let mut hash_vec: Vec<String> = Vec::new();
+        let mut images = Images::new(im_vec, hash_vec);
+        */
 
-            if path.is_file() {
-                println!("INPUT is a file..");
-                let ri = RetainedImage::from_color_image("filename", load_image_from_path(path).unwrap());
-                im_vec.push(ri);
-            } else {
-                println!("INPUT is a director.read_dir()y..");
-                for entry in path.read_dir().expect("read_dir call failed") {
-                    if let Ok(entry) = entry {
-                        // So with this we can load image(s) from a directory. Now we just need to figure out how to handle the files
-                        // Also.. this is a stupid way of doing thinghs. we should not create the window inside these conditinals. Instead
-                        // we should just load the files here and then load the window after images have been loaded.
-                        if entry.path().is_file() {
-                            let ri = RetainedImage::from_color_image("filename", load_image_from_path(entry.path().as_path()).unwrap());    
-                            im_vec.push(ri);
+        let in_file = matches.value_of("INPUT");
+
+        match in_file {
+            None => { 
+                // Don't really have to do anything here..
+            },
+            Some(s) => {
+                let path = std::path::Path::new(s);
+
+                if path.is_file() {
+                    println!("INPUT is a file..");
+                    let (ret_img, hash) = load_image_from_path(path);
+                    let ri = RetainedImage::from_color_image("filename", ret_img.unwrap());
+                    tx.send((ri, hash)).unwrap();
+                    //im_vec.push(ri);
+                    //hash_vec.push(String::from(hash));
+                } else {
+                    println!("INPUT is a director.read_dir()y..");
+                    for entry in path.read_dir().expect("read_dir call failed") {
+                        if let Ok(entry) = entry {
+                            // So with this we can load image(s) from a directory. Now we just need to figure out how to handle the files
+                            // Also.. this is a stupid way of doing thinghs. we should not create the window inside these conditinals. Instead
+                            // we should just load the files here and then load the window after images have been loaded.
+                            if entry.path().is_file() {
+                                let (ret_img, hash) = load_image_from_path(entry.path().as_path()); //.unwrap()
+                                let ri = RetainedImage::from_color_image("filename", ret_img.unwrap());
+                                tx.send((ri, hash)).unwrap();
+                                //im_vec.push(ri);
+                                //hash_vec.push(String::from(hash));
+                                // let hash1 = blake3::hash(self.images[self.index].as_bytes());
+                                //let hash = blake3::hash()
+                            }
                         }
                     }
                 }
             }
         }
-    }
+    });
+    
 
     /*
     checksum for "resources\\FVDPA5hUEAApvwP.jpg" :: "7a95a2b5c3b5ae743c233c138307e3159a44f624fdcda0eec641b37b1859bc80"
@@ -302,17 +363,17 @@ fn main() {
          xs.retain(|&x| x != some_x);
     */
 
-    let mut images = Images::new(im_vec);
+    //let mut images = Images::new(im_vec, hash_vec);
 
     // Why would i do it this way? Isn't it much more logical to make tags keys and checksums as values
     //let mut tags = HashMap::new();
-    images.tags.insert(String::from("7a95a2b5c3b5ae743c233c138307e3159a44f624fdcda0eec641b37b1859bc80"), vec![String::from("test_tag_1"), String::from("blue")]);
+    /*images.tags.insert(String::from("7a95a2b5c3b5ae743c233c138307e3159a44f624fdcda0eec641b37b1859bc80"), vec![String::from("test_tag_1"), String::from("blue")]);
     images.tags.insert(String::from("e2c5626baca673c40b41f6a2673bafd3ca02005e8bf21b7d1d78de2ee8690066"), vec![String::from("test_tag_2"), String::from("red"), String::from("blue")]);
     images.tags.insert(String::from("fc821528d427c906ad1be41e1c5350657ff6bd3f8e60758550cf202161d593f8"), vec![String::from("test_tag_1"), String::from("red")]);
     images.tags.insert(String::from("066aa787610eb2eacd2ca207947afd524ae128f02a11c767ec93ac2c5ada3fb1"), vec![String::from("red")]);
     images.tags.insert(String::from("64bf3282c8b9c8ab81fbf581f97113348fdaa87ae0ba8765bab382a93e87492b"), vec![String::from("yellow")]);
-
-    let mut test_hm: Vec<String> = images.tags.clone()
+*/
+    /*let mut test_hm: Vec<String> = images.tags.clone()
         .into_iter()
         .map(|(key, value)| {
             if value.contains(&String::from("red")) {
@@ -324,7 +385,7 @@ fn main() {
 
     test_hm.retain(|x| x != "");
     println!("{:?}", test_hm);
-
+*/
     /*
     Ok(
         "{
@@ -337,15 +398,17 @@ fn main() {
     )
     */
 
-    let j = serde_json::to_string(&images.tags.clone()).unwrap();
+/*    let j = serde_json::to_string(&images.tags.clone()).unwrap();
     println!("{}", j);
 
 
-    fs::write(data_file, j).expect("Unable to write file");
+    fs::write(data_file, j).expect("Unable to write file");*/
 
     eframe::run_native(
         "Reference Image Viewer",
         options,
-        Box::new(|cc| Box::new(RefImageView::new(cc, images))),
+        Box::new(|cc| Box::new(RefImageView::new(cc, rx))),
     );
+    // std::sync::mpsc::Receiver<_>
+    // std::sync::mpsc::Receiver<(RetainedImage, std::string::String)>
 }
