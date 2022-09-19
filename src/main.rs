@@ -59,7 +59,6 @@ impl Images {
     }
 
     fn next(&mut self) {
-        //println!("self.index: {}; self.images.len: {}", self.index, self.images.len());
         if self.index < (self.images.len() - 1) {
             self.index += 1;
         }
@@ -72,11 +71,7 @@ impl Images {
     }
 
     fn get_current_image_hash(&self) -> String {
-/*        let hash1 = blake3::hash(self.images[self.index].as_bytes());
-        return hash1.to_string();*/
-        //println!("Should return hash: {}", self.hashes[self.index]);
         if self.hashes.len() > 0 {
-            //let t = String::from(&self.hashes[self.index]);    
             return String::from(&self.hashes[self.index]);    
         }
         return String::from("");
@@ -93,18 +88,12 @@ struct RefImageView {
 
 fn load_image_from_path(path: &std::path::Path) -> 
     (std::result::Result<egui::ColorImage, image::ImageError>, String) {
-    //let image = image::io::Reader::open(path)?.decode()?;
     let image = image::io::Reader::open(path).unwrap().decode().unwrap();
     let size = [image.width() as _, image.height() as _];
     let image_buffer = image.to_rgba8();
     let pixels = image_buffer.as_flat_samples();
 
-    //let file_vec = std::fs::read(path).unwrap();
-    //let bytes: &[u8] = &file_vec; 
-    //let bytes = image.as_bytes();
     let hash1 = blake3::hash(image.as_bytes());
-
-    //println!("checksum for {:?} :: {:?}", path, hash1.to_hex());
 
     (
         Ok(egui::ColorImage::from_rgba_unmultiplied(
@@ -116,9 +105,6 @@ fn load_image_from_path(path: &std::path::Path) ->
 }
 
 impl RefImageView {
-    //fn new(cc: &eframe::CreationContext<'_>, images: Images) -> Self {
-        // std::sync::
-        // mpsc::Receiver<(std::result::Result<egui::ColorImage, image::ImageError>, String)>
     fn new(cc: &eframe::CreationContext<'_>, rx: mpsc::Receiver<(RetainedImage, std::string::String)>) -> Self {
         cc.egui_ctx.set_visuals(egui::Visuals::dark());
         //let images = Images::new(im_vec, hash_vec);
@@ -144,8 +130,6 @@ impl eframe::App for RefImageView {
                 let (img, hash) = v;
                 self.images.images.push(img);
                 self.images.hashes.push(hash);
-                                    //im_vec.push(ri);
-                    //hash_vec.push(String::from(hash));
             },
             Err(_) => ()
         }
@@ -205,17 +189,6 @@ impl eframe::App for RefImageView {
             if self.images.has_images() {
                 self.images.get(self.images.index).unwrap().show_scaled(ui, self.image_scale);    
             }
-
-/*            let tooltip_ui = |ui: &mut egui::Ui| {
-                ui.label(
-                    egui::RichText::new("Test thingie.."),
-                );
-                ui.label(format!("More tests.. {}", "yes"));
-            };*/
-
-/*            if ui.add(button).on_hover_ui(tooltip_ui).clicked() {
-                ui.output().copied_text = chr.to_string();
-            }*/
         });
 
         let size = ctx.available_rect();
@@ -288,19 +261,9 @@ fn main() {
         println!("{}", data_file);
     }
 
-    let options = eframe::NativeOptions::default();
-    
-    //let mut ci: Option<egui::ColorImage> = None;
-
     let (tx, rx) = mpsc::channel();
 
     thread::spawn(move || {
-/*        
-        let mut im_vec: Vec<RetainedImage> = Vec::new();
-        let mut hash_vec: Vec<String> = Vec::new();
-        let mut images = Images::new(im_vec, hash_vec);
-        */
-
         let in_file = matches.value_of("INPUT");
 
         match in_file {
@@ -315,8 +278,6 @@ fn main() {
                     let (ret_img, hash) = load_image_from_path(path);
                     let ri = RetainedImage::from_color_image("filename", ret_img.unwrap());
                     tx.send((ri, hash)).unwrap();
-                    //im_vec.push(ri);
-                    //hash_vec.push(String::from(hash));
                 } else {
                     println!("INPUT is a director.read_dir()y..");
                     for entry in path.read_dir().expect("read_dir call failed") {
@@ -328,10 +289,6 @@ fn main() {
                                 let (ret_img, hash) = load_image_from_path(entry.path().as_path()); //.unwrap()
                                 let ri = RetainedImage::from_color_image("filename", ret_img.unwrap());
                                 tx.send((ri, hash)).unwrap();
-                                //im_vec.push(ri);
-                                //hash_vec.push(String::from(hash));
-                                // let hash1 = blake3::hash(self.images[self.index].as_bytes());
-                                //let hash = blake3::hash()
                             }
                         }
                     }
@@ -339,76 +296,12 @@ fn main() {
             }
         }
     });
-    
 
-    /*
-    checksum for "resources\\FVDPA5hUEAApvwP.jpg" :: "7a95a2b5c3b5ae743c233c138307e3159a44f624fdcda0eec641b37b1859bc80"
-    checksum for "resources\\FVNm8h8VUAAPqJR.jpg" :: "e2c5626baca673c40b41f6a2673bafd3ca02005e8bf21b7d1d78de2ee8690066"
-    checksum for "resources\\FVP2SqSaQAAqiWu.jpg" :: "fc821528d427c906ad1be41e1c5350657ff6bd3f8e60758550cf202161d593f8"
-    checksum for "resources\\FXm37GQaMAAAYs7.png" :: "066aa787610eb2eacd2ca207947afd524ae128f02a11c767ec93ac2c5ada3fb1"
-    checksum for "resources\\qFVIAKUKaMAASwp6.jpg" :: "64bf3282c8b9c8ab81fbf581f97113348fdaa87ae0ba8765bab382a93e87492b"
-
-    let contacts: HashMap<_, _> = phones
-        .into_iter()
-        .map(|(key, phone)| {
-            (
-                key,
-                Contact {
-                    phone,
-                    address: addresses.remove(key).unwrap(),
-                },
-            )
-        })
-        .collect();
-         xs.retain(|&x| x != some_x);
-    */
-
-    //let mut images = Images::new(im_vec, hash_vec);
-
-    // Why would i do it this way? Isn't it much more logical to make tags keys and checksums as values
-    //let mut tags = HashMap::new();
-    /*images.tags.insert(String::from("7a95a2b5c3b5ae743c233c138307e3159a44f624fdcda0eec641b37b1859bc80"), vec![String::from("test_tag_1"), String::from("blue")]);
-    images.tags.insert(String::from("e2c5626baca673c40b41f6a2673bafd3ca02005e8bf21b7d1d78de2ee8690066"), vec![String::from("test_tag_2"), String::from("red"), String::from("blue")]);
-    images.tags.insert(String::from("fc821528d427c906ad1be41e1c5350657ff6bd3f8e60758550cf202161d593f8"), vec![String::from("test_tag_1"), String::from("red")]);
-    images.tags.insert(String::from("066aa787610eb2eacd2ca207947afd524ae128f02a11c767ec93ac2c5ada3fb1"), vec![String::from("red")]);
-    images.tags.insert(String::from("64bf3282c8b9c8ab81fbf581f97113348fdaa87ae0ba8765bab382a93e87492b"), vec![String::from("yellow")]);
-*/
-    /*let mut test_hm: Vec<String> = images.tags.clone()
-        .into_iter()
-        .map(|(key, value)| {
-            if value.contains(&String::from("red")) {
-                return String::from(key);
-            } 
-            return String::from("");
-        })
-        .collect();
-
-    test_hm.retain(|x| x != "");
-    println!("{:?}", test_hm);
-*/
-    /*
-    Ok(
-        "{
-            \"fc821528d427c906ad1be41e1c5350657ff6bd3f8e60758550cf202161d593f8\":[\"test_tag_1\",\"red\"],
-            \"7a95a2b5c3b5ae743c233c138307e3159a44f624fdcda0eec641b37b1859bc80\":[\"test_tag_1\",\"blue\"],
-            \"e2c5626baca673c40b41f6a2673bafd3ca02005e8bf21b7d1d78de2ee8690066\":[\"test_tag_2\",\"red\",\"blue\"],
-            \"066aa787610eb2eacd2ca207947afd524ae128f02a11c767ec93ac2c5ada3fb1\":[\"red\"],
-            \"64bf3282c8b9c8ab81fbf581f97113348fdaa87ae0ba8765bab382a93e87492b\":[\"yellow\"]
-        }"
-    )
-    */
-
-/*    let j = serde_json::to_string(&images.tags.clone()).unwrap();
-    println!("{}", j);
-
-
-    fs::write(data_file, j).expect("Unable to write file");*/
+    let options = eframe::NativeOptions::default();
 
     eframe::run_native(
         "Reference Image Viewer",
         options,
         Box::new(|cc| Box::new(RefImageView::new(cc, rx))),
     );
-    // std::sync::mpsc::Receiver<_>
-    // std::sync::mpsc::Receiver<(RetainedImage, std::string::String)>
 }
