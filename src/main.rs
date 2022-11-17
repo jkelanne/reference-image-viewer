@@ -5,6 +5,9 @@ use std::collections::HashMap;
 use std::slice::SliceIndex;
 use std::thread;
 use std::sync::mpsc;
+use std::fs::File;
+use std::io::BufReader;
+use std::fmt::Write;
 //use std::hash::{Hash, Hasher};
 use egui_extras::RetainedImage;
 use clap::{Arg, Command}; // , Parser
@@ -20,23 +23,44 @@ struct MetaData {
 
 }
 
+
+fn get_tags_filename() -> String {
+    let mut tags_file: String = String::new();
+    if let Some(proj_dirs) = ProjectDirs::from("com", "null ptr", "refiv") {
+        tags_file = proj_dirs.data_dir().to_owned().into_os_string().into_string().unwrap();
+        tags_file.push_str("\\tags.json");
+    }
+    tags_file
+}
+
 // We'll call this Images for now.. ImageCache, though it's not really a cache?
 pub struct Images {
     // Holds the images. Going with pub for now..
     pub images: Vec<RetainedImage>,
     pub hashes: Vec<String>,
+    pub filenames: Vec<String>,
     // Holds the current index
     pub index: usize,
     pub tags: HashMap<String, Vec<String>>,
 }
 
 impl Images {
-    pub fn new(images: Vec<RetainedImage>, hashes: Vec<String>) -> Self {
+    pub fn new(images: Vec<RetainedImage>, hashes: Vec<String>, filenames: Vec<String>) -> Self {
+        let tags_file = get_tags_filename();
+        let mut tags: HashMap<String, Vec<String>> = HashMap::new();
+        if path::Path::new(&tags_file).exists() {
+            let tags_raw = File::open(tags_file).unwrap();
+            let tags_reader = BufReader::new(tags_raw);
+            tags = serde_json::from_reader(tags_reader).unwrap();
+        }
+        
         Self {
             images,
             hashes,
+            filenames,
             index: 0,
-            tags: HashMap::new()
+            tags,
+            //tags: HashMap::new()
         }
     }
 
@@ -76,12 +100,26 @@ impl Images {
         }
         return String::from("");
     }
+
+    // Somekind of error handling please.. should return Result<Vec<String>> or something
+    fn get_current_image_tags(&self) -> Option<Vec<String>> {
+        if self.tags.len() == 0 {
+            return None;
+        }
+
+        //let mut result = vec![];
+        if self.tags.contains_key(&self.get_current_image_hash()) {
+            return Some(self.tags[&self.get_current_image_hash()].to_vec());
+        } else {
+            return None;
+        }
+    }
 }
 
 // We should add checksums for loaded images so that we don't have to generate them again
 struct RefImageView {
     images: Images,
-    rx: mpsc::Receiver<(RetainedImage, std::string::String)>,
+    rx: mpsc::Receiver<(RetainedImage, std::string::String, std::string::String)>,
     image_scale: f32,
     auto_resize: bool,
 }
@@ -104,14 +142,16 @@ fn load_image_from_path(path: &std::path::Path) ->
     )
 }
 
+
 impl RefImageView {
-    fn new(cc: &eframe::CreationContext<'_>, rx: mpsc::Receiver<(RetainedImage, std::string::String)>) -> Self {
+    fn new(cc: &eframe::CreationContext<'_>, rx: mpsc::Receiver<(RetainedImage, std::string::String, std::string::String)>) -> Self {
         cc.egui_ctx.set_visuals(egui::Visuals::dark());
         //let images = Images::new(im_vec, hash_vec);
 
-        let mut im_vec: Vec<RetainedImage> = Vec::new();
-        let mut hash_vec: Vec<String> = Vec::new();
-        let mut images = Images::new(im_vec, hash_vec);
+        let im_vec: Vec<RetainedImage> = Vec::new();
+        let hash_vec: Vec<String> = Vec::new();
+        let filenames: Vec<String> = Vec::new();
+        let images = Images::new(im_vec, hash_vec, filenames);
 
         Self {
             images,
@@ -127,9 +167,10 @@ impl eframe::App for RefImageView {
         let incoming_image = self.rx.try_recv();
         match incoming_image {
             Ok(v) => {
-                let (img, hash) = v;
+                let (img, hash, filename) = v;
                 self.images.images.push(img);
                 self.images.hashes.push(hash);
+                self.images.filenames.push(filename);
             },
             Err(_) => ()
         }
@@ -142,6 +183,29 @@ impl eframe::App for RefImageView {
             if ui.input_mut().consume_key(egui::Modifiers::NONE, egui::Key::ArrowLeft) {
                 //println!("IS IT HAPPENING?!?!?");
                 self.images.prev();
+            }
+
+            if ui.input_mut().consume_key(egui::Modifiers::NONE, egui::Key::I) {
+                println!("Image Info:");
+                println!("\tFilename: {}", self.images.filenames[self.images.index]);
+                println!("\tHash: {}", self.images.get_current_image_hash());
+
+                let tags: String = match self.images.get_current_image_tags() {
+                    Some(vector) => vector.join("; "),
+                    None => "No Tags!".to_string(),
+                };
+                println!("\tTags: {}", tags);
+            }
+
+            if ui.input_mut().consume_key(egui::Modifiers::NONE, egui::Key::E) {
+                /*let some_stuff = self.images.tags.iter().filter_map(|(key, &val)| if val == vec!["touhou".to_string(), "marisa".to_string()] { Some(key) } else { None })
+                .collect::<Vec<_>>();*/
+                for (key, value) in &self.images.tags {
+                    if value.contains(&"touhou".to_string()) {
+                        println!("{}", key);    
+                    }
+                }
+                
             }
 
             if ui.input_mut().consume_key(egui::Modifiers::NONE, egui::Key::Escape) {
@@ -196,14 +260,40 @@ impl eframe::App for RefImageView {
         // open(&mut true)
         // TODO: Need a way to get the window size so that we can freeze the windows
         // to the bottom right corner.
+
+/*        let mut tags: String = String::new();
+        let values = self.images.get_current_image_tags();*/
+
+        /*match values {
+            Err(v) => write!(tags, "No", v),
+            Ok(v) => {
+                for value in v {
+                    //tags.push_str(value.to_string());
+                    write!(tags, "{}; ", value).unwrap();
+                }
+            }
+        };*/
+
+        //write!(tags, "{:?}", values.unwrap());
+        // let stuff_str: String = stuff.into_iter().map(|i| i.to_string()).collect::<String>();
+        // vector.into_iter().map(|i| i.to_string()).collect::<String>(),
+
+        let tags: String = match self.images.get_current_image_tags() {
+            Some(vector) => vector.join("; "),
+            None => "No Tags!".to_string(),
+        };
+
         egui::Window::new("Test")
             .fixed_pos((size.width() - 240.0, size.height() - 70.0))
             .show(ctx, |ui| {
-                ui.label(
+/*                ui.label(
                     egui::RichText::new(self.images.get_current_image_hash()),
+                );*/
+                ui.label(format!("{}", self.images.filenames[self.images.index]));
+                ui.label(format!("current_size {:?}", ui.available_size()));
+                ui.label(
+                    egui::RichText::new(tags),
                 );
-                ui.label(format!("available_size {:?}", size));
-                ui.label(format!("current_size {:?}", ui.available_size()))
         });
     }
 }
@@ -258,14 +348,24 @@ fn main() {
         //data_file.push_str(proj_dirs.data_dir().to_owned().into_os_string().into_string().unwrap());
         data_file = proj_dirs.data_dir().to_owned().into_os_string().into_string().unwrap();
         data_file.push_str("\\tags.json");
-        println!("{}", data_file);
+        let json_exists = std::path::Path::new(&data_file).exists();
+        println!("json_exists: {:?}; data_file:  {}", json_exists, data_file);
+
+        let cache_raw = File::open(data_file).unwrap();
+        let cache_reader = BufReader::new(cache_raw);
+        let cache: HashMap<String, Vec<String>> = serde_json::from_reader(cache_reader).unwrap();
+        //println!("SERRRRRDE:\n{:?}",cache);
+
+        for(key, value) in &cache {
+            println!("\t{:?}: {:?}", key, value);
+        }
     }
 
     let (tx, rx) = mpsc::channel();
 
     thread::spawn(move || {
         let in_file = matches.value_of("INPUT");
-
+        let mut file_count = 0;
         match in_file {
             None => { 
                 // Don't really have to do anything here..
@@ -277,7 +377,7 @@ fn main() {
                     println!("INPUT is a file..");
                     let (ret_img, hash) = load_image_from_path(path);
                     let ri = RetainedImage::from_color_image("filename", ret_img.unwrap());
-                    tx.send((ri, hash)).unwrap();
+                    tx.send((ri, hash, String::from(path.to_str().unwrap()))).unwrap();
                 } else {
                     println!("INPUT is a director.read_dir()y..");
                     for entry in path.read_dir().expect("read_dir call failed") {
@@ -288,13 +388,17 @@ fn main() {
                             if entry.path().is_file() {
                                 let (ret_img, hash) = load_image_from_path(entry.path().as_path()); //.unwrap()
                                 let ri = RetainedImage::from_color_image("filename", ret_img.unwrap());
-                                tx.send((ri, hash)).unwrap();
+                                // This is really ugly..
+                                tx.send((ri, hash, String::from(entry.path().to_str().unwrap()))).unwrap();
+                                file_count += 1;
                             }
                         }
                     }
                 }
             }
         }
+
+        println!("### IMAGES LOADED! TOTAL: {} ###", file_count);
     });
 
     let options = eframe::NativeOptions::default();
