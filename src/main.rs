@@ -5,36 +5,33 @@ use std::collections::HashMap;
 use std::slice::SliceIndex;
 use std::thread;
 use std::sync::mpsc;
+//use std::io::prelude::*;
 use std::fs::File;
-use std::io::BufReader;
-use std::fmt::Write;
+use std::io::{Write, BufReader};
+//use std::fmt::Write;
 //use std::hash::{Hash, Hasher};
 use egui_extras::RetainedImage;
 use clap::{Arg, Command}; // , Parser
 //use assets_manager::{Asset, AssetCache, loader};
 //extern crate directories;
-use directories::{UserDirs, ProjectDirs};
+//use directories::{UserDirs, ProjectDirs};
+use directories::ProjectDirs;
 // use sha256::digest_bytes;
 
-use serde::{Deserialize, Serialize};
-use serde_json::Result;
-
-struct MetaData {
-
-}
+//use serde::{Deserialize, Serialize};
 
 
-fn get_tags_filename() -> String {
-    let mut tags_file: String = String::new();
-    if let Some(proj_dirs) = ProjectDirs::from("com", "null ptr", "refiv") {
-        tags_file = proj_dirs.data_dir().to_owned().into_os_string().into_string().unwrap();
-        tags_file.push_str("\\tags.json");
-    }
-    tags_file
-}
+mod utils;
+pub use crate::utils::*;
+
+mod images;
+pub use crate::images::*;
+
+mod ref_image_view;
+pub use crate::ref_image_view::*;
 
 // We'll call this Images for now.. ImageCache, though it's not really a cache?
-pub struct Images {
+/*pub struct Images {
     // Holds the images. Going with pub for now..
     pub images: Vec<RetainedImage>,
     pub hashes: Vec<String>,
@@ -114,15 +111,15 @@ impl Images {
             return None;
         }
     }
-}
+}*/
 
 // We should add checksums for loaded images so that we don't have to generate them again
-struct RefImageView {
+/*struct RefImageView {
     images: Images,
     rx: mpsc::Receiver<(RetainedImage, std::string::String, std::string::String)>,
     image_scale: f32,
     auto_resize: bool,
-}
+}*/
 
 fn load_image_from_path(path: &std::path::Path) -> 
     (std::result::Result<egui::ColorImage, image::ImageError>, String) {
@@ -143,7 +140,7 @@ fn load_image_from_path(path: &std::path::Path) ->
 }
 
 
-impl RefImageView {
+/*impl RefImageView {
     fn new(cc: &eframe::CreationContext<'_>, rx: mpsc::Receiver<(RetainedImage, std::string::String, std::string::String)>) -> Self {
         cc.egui_ctx.set_visuals(egui::Visuals::dark());
         //let images = Images::new(im_vec, hash_vec);
@@ -163,6 +160,17 @@ impl RefImageView {
 }
 
 impl eframe::App for RefImageView {
+    fn on_close_event(&mut self) -> bool {
+        // So we will save the cache and configurations here. 
+        println!("Saving tags to: {}", get_tags_filename());
+        let t = serde_json::to_string(&self.images.tags).unwrap();
+        println!("serialized tags: [{}]", t);
+        //let mut file = std::fs::File::open(&data_file).unwrap();
+        //file.write_all(b"{}").unwrap();
+        std::fs::write(get_tags_filename(), serde_json::to_string_pretty(&self.images.tags).unwrap(),).unwrap();
+        return true;
+    }
+
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         let incoming_image = self.rx.try_recv();
         match incoming_image {
@@ -206,6 +214,12 @@ impl eframe::App for RefImageView {
                     }
                 }
                 
+            }
+
+            if ui.input_mut().consume_key(egui::Modifiers::NONE, egui::Key::T) {
+                if !self.images.tags.contains_key(&self.images.get_current_image_hash()) {
+                    self.images.tags.insert(self.images.get_current_image_hash(), vec!["gura".to_string()]);
+                }
             }
 
             if ui.input_mut().consume_key(egui::Modifiers::NONE, egui::Key::Escape) {
@@ -255,6 +269,10 @@ impl eframe::App for RefImageView {
             }
         });
 
+        egui::TopBottomPanel::bottom("rev_bottom_panel").show(ctx, |ui| {
+            ui.label(egui::RichText::new(format!("[image {}/{}]", (self.images.index + 1), self.images.images.len())));
+        });
+
         let size = ctx.available_rect();
         // 340, 380
         // open(&mut true)
@@ -296,13 +314,7 @@ impl eframe::App for RefImageView {
                 );
         });
     }
-}
-
-fn get_extension_from_filename(filename: &str) -> Option<&str> {
-    std::path::Path::new(filename)
-        .extension()
-        .and_then(std::ffi::OsStr::to_str)
-}
+}*/
 
 fn main() {
     let matches = Command::new("Reference Image Viewer")
@@ -328,7 +340,6 @@ fn main() {
                 .index(1))
         .get_matches();
 
-    let mut data_file: String = String::new();
     if let Some(proj_dirs) = ProjectDirs::from("com", "null ptr", "refiv") {
         if !path::Path::new(proj_dirs.config_dir()).exists() {
             fs::create_dir_all(proj_dirs.config_dir()).expect("Unable to create config dir");
@@ -346,9 +357,15 @@ fn main() {
         // Data dirs: "C:\\Users\\jukka\\AppData\\Roaming\\null ptr\\refiv\\data"
 
         //data_file.push_str(proj_dirs.data_dir().to_owned().into_os_string().into_string().unwrap());
+        let mut data_file: String = String::new();
         data_file = proj_dirs.data_dir().to_owned().into_os_string().into_string().unwrap();
         data_file.push_str("\\tags.json");
         let json_exists = std::path::Path::new(&data_file).exists();
+        if !json_exists {
+            let mut file = std::fs::File::create(&data_file).unwrap();
+            file.write_all(b"{}").unwrap();
+            //fs::write(data_file, b"{}");
+        }
         println!("json_exists: {:?}; data_file:  {}", json_exists, data_file);
 
         let cache_raw = File::open(data_file).unwrap();
