@@ -5,16 +5,18 @@ use std::sync::mpsc;
 
 pub use crate::utils::*;
 pub use crate::images::*;
+pub use crate::app_config::*;
 
 pub struct RefImageView {
     images: Images,
     rx: mpsc::Receiver<(RetainedImage, std::string::String, std::string::String)>,
     image_scale: f32,
     auto_resize: bool,
+    app_config: AppConfig,
 }
 
 impl RefImageView {
-    pub fn new(cc: &eframe::CreationContext<'_>, rx: mpsc::Receiver<(RetainedImage, std::string::String, std::string::String)>) -> Self {
+    pub fn new(app_config: AppConfig, cc: &eframe::CreationContext<'_>, rx: mpsc::Receiver<(RetainedImage, std::string::String, std::string::String)>) -> Self {
         cc.egui_ctx.set_visuals(egui::Visuals::dark());
         //let images = Images::new(im_vec, hash_vec);
 
@@ -28,19 +30,19 @@ impl RefImageView {
             rx,
             image_scale: 1.0,
             auto_resize: false,
+            app_config,
         }  
     }
 }
 
 impl eframe::App for RefImageView {
     fn on_close_event(&mut self) -> bool {
-        // So we will save the cache and configurations here. 
-        println!("Saving tags to: {}", get_tags_filename());
-        let t = serde_json::to_string(&self.images.tags).unwrap();
-        println!("serialized tags: [{}]", t);
-        //let mut file = std::fs::File::open(&data_file).unwrap();
-        //file.write_all(b"{}").unwrap();
+        // Save the tags
         std::fs::write(get_tags_filename(), serde_json::to_string_pretty(&self.images.tags).unwrap(),).unwrap();
+
+        // Save the AppConfig
+        std::fs::write(get_conf_filename(), serde_json::to_string_pretty(&self.app_config).unwrap()).unwrap();
+
         return true;
     }
 
