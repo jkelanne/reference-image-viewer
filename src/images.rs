@@ -22,7 +22,7 @@ impl Images {
     pub fn new(images: Vec<RetainedImage>, hashes: Vec<String>, filenames: Vec<String>) -> Self {
         let tags_file = get_tags_filename();
         let mut tags: HashMap<String, Vec<String>> = HashMap::new();
-        if std::path::Path::new(&tags_file).exists() {
+        if Path::new(&tags_file).exists() {
             let tags_raw = File::open(tags_file).unwrap();
             let tags_reader = BufReader::new(tags_raw);
             tags = serde_json::from_reader(tags_reader).unwrap();
