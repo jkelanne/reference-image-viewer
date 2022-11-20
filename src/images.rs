@@ -88,4 +88,18 @@ impl Images {
             return None;
         }
     }
+
+    pub fn add_tag_to_current(&mut self, tag: String) {
+        if !self.tags.contains_key(&self.get_current_image_hash()) {
+            self.tags.insert(self.get_current_image_hash(), vec![tag]);
+        }
+    }
+
+    pub fn clear_tags_from_current(&mut self) {
+        println!("CALLED clear_tags_from_current()");
+        if self.tags.contains_key(&self.get_current_image_hash()) {
+            let r = self.tags.remove(&self.get_current_image_hash());
+            println!("removed {:?}", r);
+        }
+    }
 }

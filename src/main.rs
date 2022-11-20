@@ -22,10 +22,12 @@ mod utils;
 mod images;
 mod ref_image_view;
 mod app_config;
+mod cmdint;
 pub use crate::utils::*;
 pub use crate::images::*;
 pub use crate::ref_image_view::*;
 pub use crate::app_config::*;
+pub use crate::cmdint::*;
 
 fn load_image_from_path(path: &std::path::Path) -> 
     (std::result::Result<egui::ColorImage, image::ImageError>, String) {

@@ -6,16 +6,58 @@ use std::sync::mpsc;
 pub use crate::utils::*;
 pub use crate::images::*;
 pub use crate::app_config::*;
+pub use crate::cmdint::*;
 
-pub struct RefImageView {
+pub struct RefImageView<'a> {
     images: Images,
     rx: mpsc::Receiver<(RetainedImage, std::string::String, std::string::String)>,
     image_scale: f32,
     auto_resize: bool,
     app_config: AppConfig,
+    display_keys: bool,
+    display_tags: bool,
+    display_cmd: bool,
+    cmd_field: String,
+    cmd_parser: CommandParser<'a, Images>,
+}
+/*
+    fn test_handler(args: &str) -> Option<i32> {
+        println!("Test handler!! GOT ARGS: {}", args);
+        return Some(1337);
+    }
+
+    println!("#####################");
+
+    let mut parser: CommandParser = CommandParser::default();
+    parser.register("test_cmd", test_handler);
+    parser.execute("test_cmd 111");
+
+    println!("#####################");
+
+    if !self.images.tags.contains_key(&self.images.get_current_image_hash()) {
+        self.images.tags.insert(self.images.get_current_image_hash(), vec!["gura".to_string()]);
+    } 
+*/
+
+fn tag_add(context: &mut Images, args: Option<String>) -> Option<i32> {
+    println!("Test handler!! GOT ARGS: {}", args.as_ref().unwrap());
+    println!("Current image index: {}", context.index);
+
+    if !context.tags.contains_key(&context.get_current_image_hash()) {
+        //context.images.tags.insert(context.images.get_current_image_hash(), vec![args.to_string()]);
+        context.add_tag_to_current(args.unwrap());
+    }
+
+    return None;
 }
 
-impl RefImageView {
+fn tag_clear(context: &mut Images, _args: Option<String>) -> Option<i32> {
+    println!("TAG CLEAR CALLED!");
+    context.clear_tags_from_current();
+    return None;
+}
+
+impl<'a> RefImageView<'a> {
     pub fn new(app_config: AppConfig, cc: &eframe::CreationContext<'_>, rx: mpsc::Receiver<(RetainedImage, std::string::String, std::string::String)>) -> Self {
         cc.egui_ctx.set_visuals(egui::Visuals::dark());
         //let images = Images::new(im_vec, hash_vec);
@@ -25,17 +67,26 @@ impl RefImageView {
         let filenames: Vec<String> = Vec::new();
         let images = Images::new(im_vec, hash_vec, filenames);
 
+        let mut cmd_parser: CommandParser<Images> = CommandParser::default();
+        cmd_parser.register("tag_add", tag_add);
+        cmd_parser.register("tag_clear", tag_clear);
+
         Self {
             images,
             rx,
             image_scale: 1.0,
             auto_resize: false,
             app_config,
+            display_keys: false,
+            display_tags: true,
+            display_cmd: false,
+            cmd_field: "type cmd".to_string(),
+            cmd_parser,
         }  
     }
 }
 
-impl eframe::App for RefImageView {
+impl<'a> eframe::App for RefImageView<'a> {
     fn on_close_event(&mut self) -> bool {
         // Save the tags
         std::fs::write(get_tags_filename(), serde_json::to_string_pretty(&self.images.tags).unwrap(),).unwrap();
@@ -59,47 +110,84 @@ impl eframe::App for RefImageView {
         }
         egui::TopBottomPanel::top("rev_top_panel").show(ctx, |ui| {
             if ui.input_mut().consume_key(egui::Modifiers::NONE, egui::Key::ArrowRight) {
-                //println!("IS IT HAPPENING?!?!?");
-                self.images.next();
+                if !self.display_cmd {
+                    //println!("IS IT HAPPENING?!?!?");
+                    self.images.next();
+                }
             }
 
             if ui.input_mut().consume_key(egui::Modifiers::NONE, egui::Key::ArrowLeft) {
-                //println!("IS IT HAPPENING?!?!?");
-                self.images.prev();
+                if !self.display_cmd {
+                    //println!("IS IT HAPPENING?!?!?");
+                    self.images.prev();
+                }
             }
 
             if ui.input_mut().consume_key(egui::Modifiers::NONE, egui::Key::I) {
-                println!("Image Info:");
-                println!("\tFilename: {}", self.images.filenames[self.images.index]);
-                println!("\tHash: {}", self.images.get_current_image_hash());
+                if !self.display_cmd {
+                    println!("Image Info:");
+                    println!("\tFilename: {}", self.images.filenames[self.images.index]);
+                    println!("\tHash: {}", self.images.get_current_image_hash());
 
-                let tags: String = match self.images.get_current_image_tags() {
-                    Some(vector) => vector.join("; "),
-                    None => "No Tags!".to_string(),
-                };
-                println!("\tTags: {}", tags);
+                    let tags: String = match self.images.get_current_image_tags() {
+                        Some(vector) => vector.join("; "),
+                        None => "No Tags!".to_string(),
+                    };
+                    println!("\tTags: {}", tags);
+                }
             }
 
             if ui.input_mut().consume_key(egui::Modifiers::NONE, egui::Key::E) {
                 /*let some_stuff = self.images.tags.iter().filter_map(|(key, &val)| if val == vec!["touhou".to_string(), "marisa".to_string()] { Some(key) } else { None })
                 .collect::<Vec<_>>();*/
-                for (key, value) in &self.images.tags {
-                    if value.contains(&"touhou".to_string()) {
-                        println!("{}", key);    
+                if !self.display_cmd {
+                    for (key, value) in &self.images.tags {
+                        if value.contains(&"touhou".to_string()) {
+                            println!("{}", key);    
+                        }
                     }
                 }
-                
+            }
+
+            if ui.input_mut().consume_key(egui::Modifiers::NONE, egui::Key::F1) {
+                // Don't know how to read key holding, so should do toggle for now..
+                self.display_keys = match self.display_keys {
+                    true => false,
+                    false => true,
+                }
+            }
+
+            if ui.input_mut().consume_key(egui::Modifiers::NONE, egui::Key::F2) {
+                // Don't know how to read key holding, so should do toggle for now..
+                self.display_tags = match self.display_tags {
+                    true => false,
+                    false => true,
+                }
             }
 
             if ui.input_mut().consume_key(egui::Modifiers::NONE, egui::Key::T) {
-                if !self.images.tags.contains_key(&self.images.get_current_image_hash()) {
-                    self.images.tags.insert(self.images.get_current_image_hash(), vec!["gura".to_string()]);
+                if !self.display_cmd {
+                    if !self.images.tags.contains_key(&self.images.get_current_image_hash()) {
+                        self.images.tags.insert(self.images.get_current_image_hash(), vec!["gura".to_string()]);
+                    }                    
                 }
             }
 
             if ui.input_mut().consume_key(egui::Modifiers::NONE, egui::Key::Escape) {
+                if !self.display_cmd {
+                    frame.close();    
+                } else {
+                    self.display_cmd = false;
+                }
                 /*println!("ESC ESC ESC");*/
-                frame.close();
+                
+            }
+
+            if ui.input_mut().consume_key(egui::Modifiers::CTRL, egui::Key::Space) {
+                self.display_cmd = match self.display_cmd {
+                    true => false,
+                    false => true,
+                }
             }
 
             ui.horizontal(|ui| {
@@ -188,5 +276,72 @@ impl eframe::App for RefImageView {
                     egui::RichText::new(tags),
                 );
         });
+            /*.fixed_pos((10.0, 10.0))*/
+            
+        let mut tags_window = egui::Window::new("Tags")
+            .id(egui::Id::new("tags_window"))
+            .title_bar(false)
+            .resizable(true);
+
+        if self.display_tags {
+            tags_window.show(ctx, |ui| {
+                ui.label("tags");
+                match self.images.get_current_image_tags() {
+                    Some(v) => {
+                        for t in &v {
+                            // .background_color(egui::Color32::LIGHT_BLUE)
+                            // .color(egui::Color32::DARK_GRAY)
+                            if ui.add(egui::widgets::Label::new(
+                                egui::RichText::new(t)
+                                    .background_color(egui::Color32::LIGHT_BLUE)
+                                    .color(egui::Color32::DARK_RED)
+                                    .monospace()
+                            ).sense(egui::Sense::click())).clicked() {
+                                println!("DOES THIS WORK?!?");
+                            }
+                        }
+                    }, 
+                    None => ()
+                };
+            });    
+        }
+        
+        let hotkeys_window = egui::Window::new("Hotkeys")
+            .id(egui::Id::new("hotkeys_window"))
+            .title_bar(false);
+
+        if self.display_keys {
+            hotkeys_window.show(ctx, |ui| {
+                ui.label("hotkeys");
+                ui.label("F1 -- Display this menu");
+                ui.label("F2 -- Display tags");
+                ui.label("CTRL+Space -- Enter command");
+            });
+        }
+
+
+        let cmd_window = egui::Window::new("Command")
+            .id(egui::Id::new("cmd_window"))
+            .title_bar(false)
+            .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO);
+        if self.display_cmd {
+            cmd_window.show(ctx, |ui| {
+                 ui.horizontal(|ui| {
+                    ui.label("cmd:");
+                    let cmd = ui.add(egui::TextEdit::singleline(&mut self.cmd_field));
+                    cmd.request_focus();
+                    //if cmd.lost_focus() && ui.input().key_pressed(egui::Key::Enter) {
+                    
+                    if ui.input().key_pressed(egui::Key::Enter) {
+                        println!("huh? {}", self.cmd_field);
+                        //let s_slice: &str = &*self.cmd_field;
+                        //let tmp_str = String::from(self.cmd_field.to_owned());
+                        //let t = ;
+                        self.cmd_parser.execute(&mut self.images, Box::new(String::from(self.cmd_field.as_str().to_owned())));
+                        self.display_cmd = false;
+                    }
+                });
+            });
+        }
     }
 }

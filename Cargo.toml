@@ -16,6 +16,8 @@ blake3 = "1.3.1"
 serde = "1.0.140"
 serde_json = "1.0.82"
 serde_derive = "1.0.147"
+#gameshell = "0.4.0"
+#rusterm = "0.2.2"
 #checksums = "0.9.1"
 # sha256 = "1.0.3"
 
