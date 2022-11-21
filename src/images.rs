@@ -102,4 +102,25 @@ impl Images {
             println!("removed {:?}", r);
         }
     }
+
+    pub fn get_index_of(&self, hash: String) -> Option<usize> {
+        let index = self.hashes.iter().position(|r| r == &hash);
+        println!("Grrrr? [{}]", index.unwrap_or(0));
+        return Some(0);
+    }
+
+    pub fn get_images_with_tag(&self, tag: String) -> Option<Vec<RetainedImage>> {
+        let r_val: Vec<RetainedImage> = Vec::new();
+
+        for (key, tags) in &self.tags {
+            if tags.contains(&tag) {
+                println!("[{}] contais [{}] at index [{}]", key, tag, self.get_index_of(key.to_string()).unwrap_or(0));
+            }
+        }
+
+        if r_val.len() > 0 {
+            return Some(r_val);
+        } 
+        return None;
+    }
 }

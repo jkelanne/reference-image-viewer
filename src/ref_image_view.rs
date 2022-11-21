@@ -57,6 +57,18 @@ fn tag_clear(context: &mut Images, _args: Option<String>) -> Option<i32> {
     return None;
 }
 
+fn get_images_with_tag(context: &mut Images, args: Option<String>) -> Option<i32> {
+    match args {
+        Some(tags) => { 
+            println!("get images with tag: {}", tags);
+            context.get_images_with_tag(tags);
+        }
+        None => println!("No args!"),
+    }
+
+    return None;
+}
+
 impl<'a> RefImageView<'a> {
     pub fn new(app_config: AppConfig, cc: &eframe::CreationContext<'_>, rx: mpsc::Receiver<(RetainedImage, std::string::String, std::string::String)>) -> Self {
         cc.egui_ctx.set_visuals(egui::Visuals::dark());
@@ -70,6 +82,7 @@ impl<'a> RefImageView<'a> {
         let mut cmd_parser: CommandParser<Images> = CommandParser::default();
         cmd_parser.register("tag_add", tag_add);
         cmd_parser.register("tag_clear", tag_clear);
+        cmd_parser.register("get", get_images_with_tag);
 
         Self {
             images,
