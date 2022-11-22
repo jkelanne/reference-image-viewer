@@ -176,7 +176,13 @@ fn main() {
 /*        println!("### IMAGES LOADED! TOTAL: {} ###", file_count);*/
     });
 
-    let options = eframe::NativeOptions::default();
+    let options = eframe::NativeOptions {
+        decorated: true,
+        transparent: true,
+        min_window_size: Some(egui::vec2(320.0,100.0)),
+        multisampling: 0,
+        ..Default::default()
+    };
 
     eframe::run_native(
         "Reference Image Viewer",

@@ -17,6 +17,7 @@ pub struct RefImageView<'a> {
     display_keys: bool,
     display_tags: bool,
     display_cmd: bool,
+    display_sidebar: bool,
     cmd_field: String,
     cmd_parser: CommandParser<'a, Images>,
 }
@@ -88,11 +89,12 @@ impl<'a> RefImageView<'a> {
             images,
             rx,
             image_scale: 1.0,
-            auto_resize: false,
+            auto_resize: true,
             app_config,
             display_keys: false,
             display_tags: true,
             display_cmd: false,
+            display_sidebar: false,
             cmd_field: "type cmd".to_string(),
             cmd_parser,
         }  
@@ -121,88 +123,90 @@ impl<'a> eframe::App for RefImageView<'a> {
             },
             Err(_) => ()
         }
-        egui::TopBottomPanel::top("rev_top_panel").show(ctx, |ui| {
-            if ui.input_mut().consume_key(egui::Modifiers::NONE, egui::Key::ArrowRight) {
-                if !self.display_cmd {
-                    //println!("IS IT HAPPENING?!?!?");
-                    self.images.next();
-                }
+
+        if ctx.input_mut().consume_key(egui::Modifiers::NONE, egui::Key::F2) {
+            // Don't know how to read key holding, so should do toggle for now..
+            self.display_sidebar = match self.display_sidebar {
+                true => false,
+                false => true,
             }
+        }
 
-            if ui.input_mut().consume_key(egui::Modifiers::NONE, egui::Key::ArrowLeft) {
-                if !self.display_cmd {
-                    //println!("IS IT HAPPENING?!?!?");
-                    self.images.prev();
-                }
+        if ctx.input_mut().consume_key(egui::Modifiers::NONE, egui::Key::ArrowRight) {
+            if !self.display_cmd {
+                //println!("IS IT HAPPENING?!?!?");
+                self.images.next();
             }
+        }
 
-            if ui.input_mut().consume_key(egui::Modifiers::NONE, egui::Key::I) {
-                if !self.display_cmd {
-                    println!("Image Info:");
-                    println!("\tFilename: {}", self.images.filenames[self.images.index]);
-                    println!("\tHash: {}", self.images.get_current_image_hash());
-
-                    let tags: String = match self.images.get_current_image_tags() {
-                        Some(vector) => vector.join("; "),
-                        None => "No Tags!".to_string(),
-                    };
-                    println!("\tTags: {}", tags);
-                }
+        if ctx.input_mut().consume_key(egui::Modifiers::NONE, egui::Key::ArrowLeft) {
+            if !self.display_cmd {
+                //println!("IS IT HAPPENING?!?!?");
+                self.images.prev();
             }
+        }
 
-            if ui.input_mut().consume_key(egui::Modifiers::NONE, egui::Key::E) {
-                /*let some_stuff = self.images.tags.iter().filter_map(|(key, &val)| if val == vec!["touhou".to_string(), "marisa".to_string()] { Some(key) } else { None })
-                .collect::<Vec<_>>();*/
-                if !self.display_cmd {
-                    for (key, value) in &self.images.tags {
-                        if value.contains(&"touhou".to_string()) {
-                            println!("{}", key);    
-                        }
+        if ctx.input_mut().consume_key(egui::Modifiers::NONE, egui::Key::I) {
+            if !self.display_cmd {
+                println!("Image Info:");
+                println!("\tFilename: {}", self.images.filenames[self.images.index]);
+                println!("\tHash: {}", self.images.get_current_image_hash());
+
+                let tags: String = match self.images.get_current_image_tags() {
+                    Some(vector) => vector.join("; "),
+                    None => "No Tags!".to_string(),
+                };
+                println!("\tTags: {}", tags);
+            }
+        }
+
+        if ctx.input_mut().consume_key(egui::Modifiers::NONE, egui::Key::E) {
+            /*let some_stuff = self.images.tags.iter().filter_map(|(key, &val)| if val == vec!["touhou".to_string(), "marisa".to_string()] { Some(key) } else { None })
+            .collect::<Vec<_>>();*/
+            if !self.display_cmd {
+                for (key, value) in &self.images.tags {
+                    if value.contains(&"touhou".to_string()) {
+                        println!("{}", key);    
                     }
                 }
             }
+        }
 
-            if ui.input_mut().consume_key(egui::Modifiers::NONE, egui::Key::F1) {
-                // Don't know how to read key holding, so should do toggle for now..
-                self.display_keys = match self.display_keys {
-                    true => false,
-                    false => true,
-                }
+        if ctx.input_mut().consume_key(egui::Modifiers::NONE, egui::Key::F1) {
+            // Don't know how to read key holding, so should do toggle for now..
+            self.display_keys = match self.display_keys {
+                true => false,
+                false => true,
             }
+        }
 
-            if ui.input_mut().consume_key(egui::Modifiers::NONE, egui::Key::F2) {
-                // Don't know how to read key holding, so should do toggle for now..
-                self.display_tags = match self.display_tags {
-                    true => false,
-                    false => true,
-                }
+
+        if ctx.input_mut().consume_key(egui::Modifiers::NONE, egui::Key::T) {
+            if !self.display_cmd {
+                if !self.images.tags.contains_key(&self.images.get_current_image_hash()) {
+                    self.images.tags.insert(self.images.get_current_image_hash(), vec!["gura".to_string()]);
+                }                    
             }
+        }
 
-            if ui.input_mut().consume_key(egui::Modifiers::NONE, egui::Key::T) {
-                if !self.display_cmd {
-                    if !self.images.tags.contains_key(&self.images.get_current_image_hash()) {
-                        self.images.tags.insert(self.images.get_current_image_hash(), vec!["gura".to_string()]);
-                    }                    
-                }
+        if ctx.input_mut().consume_key(egui::Modifiers::NONE, egui::Key::Escape) {
+            if !self.display_cmd {
+                frame.close();    
+            } else {
+                self.display_cmd = false;
             }
+            /*println!("ESC ESC ESC");*/
+            
+        }
 
-            if ui.input_mut().consume_key(egui::Modifiers::NONE, egui::Key::Escape) {
-                if !self.display_cmd {
-                    frame.close();    
-                } else {
-                    self.display_cmd = false;
-                }
-                /*println!("ESC ESC ESC");*/
-                
+        if ctx.input_mut().consume_key(egui::Modifiers::CTRL, egui::Key::Space) {
+            self.display_cmd = match self.display_cmd {
+                true => false,
+                false => true,
             }
+        }
 
-            if ui.input_mut().consume_key(egui::Modifiers::CTRL, egui::Key::Space) {
-                self.display_cmd = match self.display_cmd {
-                    true => false,
-                    false => true,
-                }
-            }
-
+        egui::TopBottomPanel::top("rev_top_panel").show(ctx, |ui| {
             ui.horizontal(|ui| {
                 if ui.button("<").clicked() {
                     self.images.prev();
@@ -225,7 +229,31 @@ impl<'a> eframe::App for RefImageView<'a> {
             });
         });
 
-        egui::CentralPanel::default().show(ctx, |ui| {
+        egui::TopBottomPanel::bottom("rev_bottom_panel").show(ctx, |ui| {
+            ui.label(egui::RichText::new(format!("[image {}/{}]", (self.images.index + 1), self.images.images.len())));
+        });
+
+        let tags: String = match self.images.get_current_image_tags() {
+            Some(vector) => vector.join("; "),
+            None => "No Tags!".to_string(),
+        };
+
+        if self.display_sidebar {
+            egui::SidePanel::right("my_right_panel").show(ctx, |ui| {
+                ui.label("yay");
+                  ui.label(
+                    egui::RichText::new(self.images.get_current_image_hash()),
+                );
+                ui.label(format!("{}", self.images.filenames[self.images.index]));
+                ui.label(format!("current_size {:?}", ui.available_size()));
+                ui.label(
+                    egui::RichText::new(tags),
+                );
+            });            
+        }
+
+        egui::CentralPanel::default()
+            .show(ctx, |ui| {
             if self.auto_resize {
                 let panel_ratio = ui.available_width() / ui.available_height();
 
@@ -245,9 +273,6 @@ impl<'a> eframe::App for RefImageView<'a> {
             }
         });
 
-        egui::TopBottomPanel::bottom("rev_bottom_panel").show(ctx, |ui| {
-            ui.label(egui::RichText::new(format!("[image {}/{}]", (self.images.index + 1), self.images.images.len())));
-        });
 
         let size = ctx.available_rect();
         // 340, 380
@@ -272,12 +297,9 @@ impl<'a> eframe::App for RefImageView<'a> {
         // let stuff_str: String = stuff.into_iter().map(|i| i.to_string()).collect::<String>();
         // vector.into_iter().map(|i| i.to_string()).collect::<String>(),
 
-        let tags: String = match self.images.get_current_image_tags() {
-            Some(vector) => vector.join("; "),
-            None => "No Tags!".to_string(),
-        };
 
-        egui::Window::new("Test")
+
+/*        egui::Window::new("Test")
             .fixed_pos((size.width() - 240.0, size.height() - 70.0))
             .show(ctx, |ui| {
 /*                ui.label(
@@ -288,7 +310,7 @@ impl<'a> eframe::App for RefImageView<'a> {
                 ui.label(
                     egui::RichText::new(tags),
                 );
-        });
+        });*/
             /*.fixed_pos((10.0, 10.0))*/
             
         let mut tags_window = egui::Window::new("Tags")
